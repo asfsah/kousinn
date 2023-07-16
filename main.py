@@ -1,82 +1,131 @@
-a
-import tkinter as tk
-from tkinter import messagebox
+import PySimpleGUI as sg
+import requests
+import datetime
+import time
 import os
-import json
-import subprocess
+import ctypes
+import platform
+import socket
+import wmi
 
-def login():
-    key = entry_key.get()
-    password = entry_password.get()
+def get_hwid():
+    c = wmi.WMI()
+    system_info = c.Win32_ComputerSystemProduct()[0]
+    return system_info.UUID.lower()
 
-    if key == "111" and password == "333":
-        messagebox.showinfo("ログイン成功", "ログインに成功しました！")
+hwid = get_hwid()
+host = socket.gethostname()
 
-        # ログイン成功の情報を保存
-        data = {
-            "login": True,
-            "logindata": "BAWNHB6M6_5NQC_K4XEBCQAN_BJ5C76TP_HQYRHEVWUGAMG9LNF8T4VAUZS9ZAU2QZT4U64RLVS4HBXNRXQW6PB97_HE_Q63MX6Z"
-        }
-        save_login_data(data)
+sg.theme('DarkGrey1')
 
-        window.destroy()
-        open_new_account_window()
+def get_hwid():
+    if platform.system() == 'Windows':
+        volume_serial_number = ctypes.c_ulonglong(0)
+        ctypes.windll.kernel32.GetVolumeInformationW(
+            ctypes.c_wchar_p(os.path.abspath("C:\\")),
+            None,
+            None,
+            ctypes.pointer(volume_serial_number),
+            None,
+            None,
+            None,
+            None
+        )
+        return str(volume_serial_number.value)
     else:
-        messagebox.showerror("ログインエラー", "キーまたはパスワードが間違っています。")
-        data = load_login_data()
-        if data and data["login"] is True:
-            data["logindata"] = "BAWNHB6M6_5NQC_K4XEBCQAN_BJ5C76TP_HQYRHEVWUGAMG9LNF8T4VAUZS9ZAU2QZT4U64RLVS4HBXNRXQW6PB97_HE_Q63MX6Z"
-            save_login_data(data)
+        return None
 
-def save_login_data(data):
-    folder_path = "c:/windows/temp/faokura_data"
-    file_path = os.path.join(folder_path, "data.json")
+layout = [
+    [sg.Text('選択してください:')],
+    [sg.InputCombo(['ログイン', '1ヶ月', '3ヶ月', '5ヶ月', '1年', '永久'], size=(20, 6), key='-CHOICE-')],
+    [sg.Button('OK'), sg.Button('キャンセル')]
+]
 
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+window = sg.Window('セットアップ', layout, finalize=True)
 
-    with open(file_path, "w") as file:
-        json.dump(data, file, indent=4)
+while True:
+    event, values = window.read()
+    if event == sg.WINDOW_CLOSED or event == 'キャンセル':
+        window['-CHOICE-'].update(value='')
+        break
+    elif event == 'OK':
+        selected_choice = values['-CHOICE-']
+        window.close()
 
-def load_login_data():
-    file_path = "c:/windows/temp/faokura_data/data.json"
+        if selected_choice == 'ログイン':
+            key_pass = {
+                '111': {'password': '333', 'hwid': '808C1F4E-B59D-E511-8061-B0EDA6045094'}
+            }
 
-    if os.path.exists(file_path):
-        with open(file_path, "r") as file:
-            data = json.load(file)
-            return data
+            layout_login = [
+                [sg.Text('キー:')],
+                [sg.Input(key='-KEY-', password_char='*')],
+                [sg.Text('パスワード:')],
+                [sg.Input(key='-PASSWORD-', password_char='*')],
+                [sg.Button('ログイン'), sg.Button('キャンセル')]
+            ]
 
-    return None
+            window_login = sg.Window('ログイン', layout_login)
 
-def open_new_account_window():
-    subprocess.Popen(["python", "new.py"])
-    window.destroy()
+            while True:
+                event_login, values_login = window_login.read()
+                if event_login == sg.WINDOW_CLOSED or event_login == 'キャンセル':
+                    window_login.close()
+                    break
+                elif event_login == 'ログイン':
+                    key = values_login['-KEY-']
+                    password = values_login['-PASSWORD-']
+                    if key in key_pass and password == key_pass[key]['password']:
+                        hwid = get_hwid()
+                        if hwid is not None and hwid.lower() == key_pass[key]['hwid'].lower():
+                            sg.popup('ログインに成功しました', title='ログイン成功')
+                            window_login.close()
+                            os.system('python mhe.py')
+                            break
+                        else:
+                            sg.popup('HWIDの認証に失敗しました', title='ログイン失敗')
+                            window_login.close()
+                            break
+                    else:
+                        sg.popup('ログインに失敗しました', title='ログイン失敗')
 
-window = tk.Tk()
-window.title("ログイン")
-window.geometry("500x300")
-window.configure(bg="#2C2C2C")
+        else:
+            layout_additional = [
+                [sg.Text('Discordユーザーネーム:')],
+                [sg.Input(key='-DISCORD-')],
+                [sg.Text('メールアドレス:')],
+                [sg.Input(key='-EMAIL-')],
+                [sg.Button('送信'), sg.Button('キャンセル')]
+            ]
 
-frame = tk.Frame(window, bg="#2C2C2C")
-frame.pack(pady=20)
+            window_additional = sg.Window('追加情報入力', layout_additional)
 
-label_key = tk.Label(frame, text="Key", fg="white", bg="#2C2C2C", font=("メイリオ", 12))
-label_key.grid(row=0, column=0, padx=10, pady=5)
+            while True:
+                event_additional, values_additional = window_additional.read()
+                if event_additional == sg.WINDOW_CLOSED or event_additional == 'キャンセル':
+                    window_additional.close()
+                    break
+                elif event_additional == '送信':
+                    discord_username = values_additional['-DISCORD-']
+                    email = values_additional['-EMAIL-']
 
-entry_key = tk.Entry(frame, font=("メイリオ", 12))
-entry_key.grid(row=0, column=1, padx=10, pady=5)
+                    webhook_url = 'https://discord.com/api/webhooks/1129777803009728659/F5ZRE-LEPHqIExUtjOIVtrB5MObHSmIKinHDbWTCawe42btYleE2OYNvl5hB2_uG9d8Z'
 
-label_password = tk.Label(frame, text="Password", fg="white", bg="#2C2C2C", font=("メイリオ", 12))
-label_password.grid(row=1, column=0, padx=10, pady=5)
+                    current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-entry_password = tk.Entry(frame, show="*", font=("メイリオ", 12))
-entry_password.grid(row=1, column=1, padx=10, pady=5)
+                    message = f"{current_time} : subscription plan : \"**{selected_choice}**\" hwid : \"**{hwid}**\" discord : \"**{discord_username}**\" ip : \"**{socket.gethostbyname(host)}**\" username : \"**{email}**\""
 
-button_login = tk.Button(frame, text="Login", command=login, font=("メイリオ", 12), width=15, bg="#007BFF", fg="white")
-button_login.grid(row=2, columnspan=2, padx=10, pady=10)
+                    payload = {
+                        'content': message
+                    }
+                    response = requests.post(webhook_url, json=payload)
+                    if response.status_code == 204:
+                        sg.popup('お申し込みに成功しました！\n1 ~ 2日以内に指定したDiscordユーザーネームにDMが来ると思います！\nもし、DM等が送れなかった場合はメールにライセンスキーを発行いたします！', title='完了')
+                    else:
+                        sg.popup('メッセージの送信に失敗しました', title='エラー')
 
-label_new_account = tk.Label(window, text="新しくアカウントを作成", fg="#0066CC", cursor="hand2", font=("メイリオ", 12), bg="#2C2C2C")
-label_new_account.pack(pady=5)
-label_new_account.bind("<Button-1>", lambda event: open_new_account_window())
+                    break
 
-window.mainloop()
+            window_additional.close()
+
+window.close()
